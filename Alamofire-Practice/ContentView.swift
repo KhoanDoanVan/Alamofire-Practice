@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Foundation
+import Alamofire
 
 struct Weather: Codable {
     var location: Location
@@ -39,6 +40,19 @@ struct Condition: Codable {
 }
 
 struct ContentView: View {
+    
+    @State private var results = [ForecastDay]()
+    
+    let blueSky = Color.init(red: 135/255, green: 206/255, blue: 235/255)
+    let greySky = Color.init(red: 47/255, green: 79/255, blue: 79/255)
+    
+    @State var backgroundColor = Color.init(red: 135/255, green: 206/255, blue: 235/255)
+    @State var weatherEmoji = "☀️"
+    @State var currentTemp = 0
+    @State var conditionText = "Slightly Overcast"
+    @State var cityName = "Toronto"
+    @State var loading = true
+    
     var body: some View {
         VStack {
             Spacer()
@@ -68,6 +82,35 @@ struct ContentView: View {
             Text("Data supplied by Weather API")
                 .font(.system(size: 14))
         }
+        .task {
+            await fetchWeather()
+        }
+    }
+    
+    func fetchWeather() async {
+        let request = AF.request("http://api.weatherapi.com/v1/forecast.json?key=5490adc7793a49c38fb72346252502&q=M1G3T8&days=3&aqi=no&alerts=no")
+        
+        request.responseDecodable(of: Weather.self) { response in
+            
+            switch response.result {
+                
+            case .success(let weather):
+                dump(weather)
+                
+                cityName = weather.location.name
+                results = weather.forecast.forecastday
+                currentTemp = Int(results[0].day.avgtemp_c)
+                backgroundColor = getBackgroundColor(text: results[0].day.condition.text)
+                weatherEmoji = getWeatherEmoji(text: results[0].day.condition.text)
+                conditionText = results[0].day.condition.text
+                loading = false
+                
+                
+            case.failure(let error):
+                print(error)
+            }
+            
+        }
     }
     
     func getWeatherEmoji(text: String) -> String {
@@ -90,7 +133,20 @@ struct ContentView: View {
         return weatherEmoji
     }
     
+    func getBackgroundColor(text: String) -> Color {
+        var backgroundColor = blueSky
+        let conditionText = text.lowercased()
+        
+        if !(conditionText.contains("clear")) || conditionText.contains("sunny") {
+            backgroundColor = greySky
+        }
+        
+        return backgroundColor
+    }
     
+    func getShortDate(epoch: Int) -> String {
+        return Date(timeIntervalSince1970: TimeInterval(epoch)).formatted(Date.FormatStyle().weekday(.abbreviated))
+    }
 }
 
 #Preview {
